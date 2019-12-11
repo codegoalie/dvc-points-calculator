@@ -112,7 +112,6 @@ func main() {
 
 			for {
 				nextPoints, err := getNextPoints(roomType, curDate)
-				// fmt.Println(resort, roomType, curDate, nextPoints, runningPoints)
 				if err != nil {
 					if !errors.Is(err, ErrPointsNotAvailable) {
 						fmt.Printf("Error getting points: %s", err.Error())
