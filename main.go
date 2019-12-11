@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"time"
 )
@@ -18,22 +19,84 @@ type RoomType struct {
 	Name        string
 	Description string
 	ViewType    string
+
+	PointChart []PointBlock
+}
+
+// PointBlock models the points needed to stay in a RoomType over a range of dates
+type PointBlock struct {
+	StartDate     time.Time
+	EndDate       time.Time
+	WeekdayPoints int
+	WeekendPoints int
 }
 
 // ErrPointsNotAvailable is reported when points are not available for the RoomType and date
 var ErrPointsNotAvailable = errors.New("Points not available")
 
-var resorts = []Resort{
-	{
-		Name: "The Villas at Grand Floridian",
-		RoomTypes: []RoomType{
-			{
-				Name:        "Deluxe Studio",
-				Description: "(Sleeps up to 5)",
-				ViewType:    "Standard",
+var resorts []Resort
+var est *time.Location
+
+func init() {
+	var err error
+	est, err = time.LoadLocation("America/New_York")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resorts = []Resort{
+		{
+			Name: "The Villas at Grand Floridian",
+			RoomTypes: []RoomType{
+				{
+					Name:        "Deluxe Studio",
+					Description: "(Sleeps up to 5)",
+					ViewType:    "Standard",
+					PointChart: []PointBlock{
+						// 2019
+						{ // Adventure Season 1
+							StartDate:     time.Date(2019, time.January, 1, 0, 0, 0, 0, est),
+							EndDate:       time.Date(2019, time.January, 31, 23, 59, 59, 0, est),
+							WeekendPoints: 20,
+							WeekdayPoints: 17,
+						},
+						{ // Adventure Season 2
+							StartDate:     time.Date(2019, time.September, 1, 0, 0, 0, 0, est),
+							EndDate:       time.Date(2019, time.September, 30, 23, 59, 59, 0, est),
+							WeekendPoints: 20,
+							WeekdayPoints: 17,
+						},
+						{ // Adventure Season 3
+							StartDate:     time.Date(2019, time.December, 1, 0, 0, 0, 0, est),
+							EndDate:       time.Date(2019, time.December, 14, 23, 59, 59, 0, est),
+							WeekendPoints: 20,
+							WeekdayPoints: 17,
+						},
+						{ // Choice Season 3
+							StartDate:     time.Date(2019, time.December, 15, 0, 0, 0, 0, est),
+							EndDate:       time.Date(2019, time.December, 23, 23, 59, 59, 0, est),
+							WeekendPoints: 20,
+							WeekdayPoints: 17,
+						},
+						{ // Premier Season 2
+							StartDate:     time.Date(2019, time.December, 24, 0, 0, 0, 0, est),
+							EndDate:       time.Date(2019, time.December, 31, 23, 59, 59, 0, est),
+							WeekendPoints: 31,
+							WeekdayPoints: 36,
+						},
+
+						// 2020
+						{ // Adventure Season 1
+							StartDate:     time.Date(2020, time.January, 1, 0, 0, 0, 0, est),
+							EndDate:       time.Date(2020, time.January, 31, 23, 59, 59, 0, est),
+							WeekendPoints: 20,
+							WeekdayPoints: 17,
+						},
+					},
+				},
 			},
 		},
-	},
+	}
 }
 
 func main() {
@@ -81,9 +144,15 @@ func main() {
 }
 
 func getNextPoints(roomType RoomType, curDate time.Time) (int, error) {
-	if curDate.After(time.Now().AddDate(0, 1, 0)) {
-		return -1, ErrPointsNotAvailable
+	for _, pointBlock := range roomType.PointChart {
+		if curDate.After(pointBlock.StartDate) && curDate.Before(pointBlock.EndDate) {
+			dayOfWeek := curDate.Weekday()
+			if dayOfWeek == time.Friday || dayOfWeek == time.Saturday {
+				return pointBlock.WeekendPoints, nil
+			}
+			return pointBlock.WeekdayPoints, nil
+		}
 	}
 
-	return 19, nil
+	return -1, ErrPointsNotAvailable
 }
