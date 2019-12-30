@@ -76,42 +76,54 @@ func init() {
 
 func main() {
 	goalPoints := 120
-	// minDays := 4
-	startDate := time.Now().AddDate(0, 0, 1)
+	minDays := 4
+	startDate := time.Now().AddDate(1, 1, 1)
+
+	// spew.Dump(resorts[0])
 
 	for _, resort := range resorts {
 		for _, roomType := range resort.RoomTypes {
 			curDate := startDate
 			tripStart := curDate
 			runningPoints := 0
+			runningNights := 0
+			// fmt.Println(roomType, curDate, tripStart, runningPoints)
 
 			for {
 				nextPoints, err := getNextPoints(roomType, curDate)
 				if err != nil {
 					if !errors.Is(err, ErrPointsNotAvailable) {
-						fmt.Printf("Error getting points: %s", err.Error())
+						fmt.Printf("Error getting points: %s -- %s -- %s\n", err.Error(), roomType.Name, curDate)
 					}
 					break
 				}
+				// fmt.Println(roomType.Name, len(roomType.PointChart), curDate, nextPoints)
 
-				if runningPoints+nextPoints > goalPoints {
-					// report found stay
-					fmt.Printf("%s - %s - %s\t%s - %s \t%d nights\t%d\n",
-						resort.Name,
-						roomType.Name,
-						roomType.ViewType,
-						tripStart.Format("2006-01-02"),
-						curDate.Format("2006-01-02"),
-						int(math.Ceil(curDate.Sub(tripStart).Hours()/24.0)),
-						runningPoints,
-					)
+				if runningPoints+nextPoints > goalPoints || runningNights > 30 {
+					if runningPoints > 0 &&
+						runningNights >= minDays {
+						// report found stay
+						fmt.Printf("%s - %s - %s\t%s - %s \t%d nights\t%d\n",
+							resort.Name,
+							roomType.Name,
+							roomType.ViewType,
+							tripStart.Format("2006-01-02"),
+							curDate.Format("2006-01-02"),
+							int(math.Ceil(curDate.Sub(tripStart).Hours()/24.0)),
+							runningPoints,
+						)
+					}
 					runningPoints = 0
+					runningNights = 0
+					curDate = curDate.AddDate(0, 0, 1)
 					tripStart = curDate
 					continue
 				}
 
+				runningNights++
 				curDate = curDate.AddDate(0, 0, 1)
 				runningPoints += nextPoints
+				// fmt.Println(runningPoints, runningNights, curDate)
 			}
 		}
 	}
