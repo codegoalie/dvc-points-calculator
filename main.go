@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // Resort models a WDW resort
@@ -31,6 +35,8 @@ type PointBlock struct {
 	WeekendPoints int
 }
 
+var dbBucketName = []byte("2021")
+
 // ErrPointsNotAvailable is reported when points are not available for the RoomType and date
 var ErrPointsNotAvailable = errors.New("Points not available")
 
@@ -44,59 +50,28 @@ func init() {
 		log.Fatal(err)
 	}
 
-	resorts = []Resort{
-		{
-			Name: "The Villas at Grand Floridian",
-			RoomTypes: []RoomType{
-				{
-					Name:        "Deluxe Studio",
-					Description: "(Sleeps up to 5)",
-					ViewType:    "Standard",
-					PointChart: []PointBlock{
-						// 2019
-						{ // Adventure Season 1
-							StartDate:     time.Date(2019, time.January, 1, 0, 0, 0, 0, est),
-							EndDate:       time.Date(2019, time.January, 31, 23, 59, 59, 0, est),
-							WeekendPoints: 20,
-							WeekdayPoints: 17,
-						},
-						{ // Adventure Season 2
-							StartDate:     time.Date(2019, time.September, 1, 0, 0, 0, 0, est),
-							EndDate:       time.Date(2019, time.September, 30, 23, 59, 59, 0, est),
-							WeekendPoints: 20,
-							WeekdayPoints: 17,
-						},
-						{ // Adventure Season 3
-							StartDate:     time.Date(2019, time.December, 1, 0, 0, 0, 0, est),
-							EndDate:       time.Date(2019, time.December, 14, 23, 59, 59, 0, est),
-							WeekendPoints: 20,
-							WeekdayPoints: 17,
-						},
-						{ // Choice Season 3
-							StartDate:     time.Date(2019, time.December, 15, 0, 0, 0, 0, est),
-							EndDate:       time.Date(2019, time.December, 23, 23, 59, 59, 0, est),
-							WeekendPoints: 20,
-							WeekdayPoints: 17,
-						},
-						{ // Premier Season 2
-							StartDate:     time.Date(2019, time.December, 24, 0, 0, 0, 0, est),
-							EndDate:       time.Date(2019, time.December, 31, 23, 59, 59, 0, est),
-							WeekendPoints: 31,
-							WeekdayPoints: 36,
-						},
-
-						// 2020
-						{ // Adventure Season 1
-							StartDate:     time.Date(2020, time.January, 1, 0, 0, 0, 0, est),
-							EndDate:       time.Date(2020, time.January, 31, 23, 59, 59, 0, est),
-							WeekendPoints: 20,
-							WeekdayPoints: 17,
-						},
-					},
-				},
-			},
-		},
+	db, err := bolt.Open("../dvc-points.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
+
+	err = db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(dbBucketName)
+		c := b.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			resort := Resort{}
+			err := json.Unmarshal(v, &resort)
+			if err != nil {
+				err = fmt.Errorf("failed to parse resort %s: %w", v, err)
+				log.Fatal(err)
+			}
+			resorts = append(resorts, resort)
+		}
+
+		return nil
+	})
 }
 
 func main() {
